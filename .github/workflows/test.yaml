@@ -10,9 +10,27 @@ jobs:
     runs-on: ubuntu-22.04
     if: ${{ github.event.issue.pull_request && contains( github.event.comment.body, 'firebase-preview' ) }}
     steps:
+      - name: Extracting PR route
+        id: extracting_route
+        run: |
+          echo "route=$(echo ${{ github.event.issue.pull_request.url }}  | sed s-https://api.github.com--)" >> $GITHUB_OUTPUT
+      - name: Getting PR data
+        id: pr_data
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET ${{ steps.extracting_route.outputs.route }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set PR Ref
+        id: pr_ref
+        run: |
+          echo "head_ref=${{ fromJson(steps.pr_data.outputs.data).head.ref }}" >> $GITHUB_OUTPUT
+          echo "base_ref=${{ fromJson(steps.pr_data.outputs.data).base.ref }}" >> $GITHUB_OUTPUT
       - name: Get site name
         id: site_name
         uses: actions/github-script@v7
+        env:
+          BASE_REF: ${{ steps.pr_ref.outputs.base_ref }}
         with:
           result-encoding: string
           # Get the environment name from the comment body
@@ -22,7 +40,7 @@ jobs:
           # - other branches => `staging`
           script: |
             const comment = context.payload.comment.body;
-            const defaultSiteName = github.base_ref === 'main' ? 'production' : 'staging'
+            const defaultSiteName = process.env["BASE_REF"] === 'main' ? 'production' : 'staging';
             const siteName = comment.match(/.*firebase-preview +(\w+).*/i, '$1')?.[1] || defaultSiteName;
             return siteName;
       - name: Echo
