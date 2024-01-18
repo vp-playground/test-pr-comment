@@ -1,0 +1,29 @@
+name: Deploy Firebase Preview
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  build:
+    name: Build & Deploy
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.issue.pull_request && contains( github.event.comment.body, 'firebase-preview' ) }}
+    steps:
+      - name: Get site name
+        id: site_name
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          # Get the environment name from the comment body
+          # `firebase-preview staging` => `staging`
+          # Default:
+          # - `main` branch => `production`
+          # - other branches => `staging`
+          script: |
+            const comment = context.payload.comment.body;
+            const defaultSiteName = github.base_ref === 'main' ? 'production' : 'staging'
+            const siteName = comment.match(/.*firebase-preview +(\w+).*/i, '$1')?.[1] || defaultSiteName;
+            return siteName;
+      - name: Echo
+        run: echo ${{ steps.site_name.outputs.result }}
